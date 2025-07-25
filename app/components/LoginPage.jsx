@@ -1,3 +1,5 @@
+"use client"
+
 import React, { useState } from "react";
 import { Eye, EyeOff, User } from "lucide-react";
 
@@ -109,7 +111,7 @@ const LoginPage = ({ onLogin }) => {
                 type="submit"
                 onClick={handleSubmit}
                 disabled={loading || !username || !password}
-                className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed text-center"
+                className="btn-primary w-full py-3 disabled:opacity-50 disabled:cursor-not-allowed flex justify-center"
               >
                 {loading ? (
                   <div className="flex items-center justify-center">

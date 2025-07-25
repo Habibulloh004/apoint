@@ -1,6 +1,8 @@
+"use client";
+
 import { useState, useEffect } from "react";
-import { apiService } from "../services/api";
 import { getCurrentMonthDates } from "../utils/dateUtils";
+import axios from "axios";
 
 export const useMaterials = (token) => {
   const [materialsData, setMaterialsData] = useState([]);
@@ -16,12 +18,23 @@ export const useMaterials = (token) => {
       setError(null);
 
       const { start, end } = customDateRange || dateRange;
-      const data = await apiService.getMaterials(token, start, end);
+      const response = await axios.get(`/api/materials?start=${start}&end=${end}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
 
+      if (response.status != 200) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      const data = await response.data;
       setMaterialsData(data);
     } catch (err) {
       console.error("Failed to fetch materials:", err);
-      setError(err.message || "Failed to fetch materials data");
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch materials data"
+      );
     } finally {
       setLoading(false);
     }

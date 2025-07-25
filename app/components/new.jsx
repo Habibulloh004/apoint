@@ -1,4 +1,12 @@
-import React, { useState, useMemo } from "react";
+"use client";
+
+import React, {
+  useState,
+  useMemo,
+  useCallback,
+  useRef,
+  useEffect,
+} from "react";
 import {
   ChevronDown,
   ChevronRight,
@@ -20,7 +28,11 @@ const MaterialsTable = ({ token, onLogout }) => {
     useMaterials(token);
   const [expandedGroups, setExpandedGroups] = useState({});
   const [searchTerm, setSearchTerm] = useState("");
-  console.log(materialsData)
+  const [visibleItems, setVisibleItems] = useState({});
+  const tableContainerRef = useRef(null);
+
+  const ITEMS_PER_PAGE = 10;
+  const LOAD_MORE_THRESHOLD = 10; // pixels from bottom to trigger load more
 
   // Filter data based on search term
   const filteredData = useMemo(() => {
@@ -29,10 +41,12 @@ const MaterialsTable = ({ token, onLogout }) => {
     const term = searchTerm.toLowerCase();
     return materialsData.filter(
       (item) =>
-        item.name.toLowerCase().includes(term) ||
-        item.code.toLowerCase().includes(term) ||
-        item.category.toLowerCase().includes(term) ||
-        item.parent.toLowerCase().includes(term)
+        (item.name && item.name.toLowerCase().includes(term)) ||
+        (item.code && item.code.toLowerCase().includes(term)) ||
+        (item.category && item.category.toLowerCase().includes(term)) ||
+        (item.parent && item.parent.toLowerCase().includes(term)) ||
+        (item.unit && item.unit.toLowerCase().includes(term)) ||
+        (item.material_id && item.material_id.toString().includes(term))
     );
   }, [materialsData, searchTerm]);
 
@@ -43,22 +57,121 @@ const MaterialsTable = ({ token, onLogout }) => {
   );
   const totals = useMemo(() => calculateTotals(groupedData), [groupedData]);
 
+  // Initialize visible items for each category
+  useEffect(() => {
+    const initialVisibleItems = {};
+    Object.keys(groupedData).forEach((parent) => {
+      Object.keys(groupedData[parent]).forEach((category) => {
+        const categoryKey = `${parent}-${category}`;
+        initialVisibleItems[categoryKey] = Math.min(
+          ITEMS_PER_PAGE,
+          groupedData[parent][category].length
+        );
+      });
+    });
+    setVisibleItems(initialVisibleItems);
+  }, [groupedData]);
+
+  // Get visible items for a category with pagination
+  const getVisibleCategoryItems = useCallback(
+    (parent, category) => {
+      const categoryKey = `${parent}-${category}`;
+      const allItems = groupedData[parent]?.[category] || [];
+      const visibleCount = visibleItems[categoryKey] || ITEMS_PER_PAGE;
+      return allItems.slice(0, visibleCount);
+    },
+    [groupedData, visibleItems]
+  );
+
+  // Load more items for a category
+  const loadMoreItems = useCallback(
+    (parent, category) => {
+      const categoryKey = `${parent}-${category}`;
+      const currentVisible = visibleItems[categoryKey] || ITEMS_PER_PAGE;
+      const totalItems = groupedData[parent]?.[category]?.length || 0;
+
+      if (currentVisible < totalItems) {
+        setVisibleItems((prev) => ({
+          ...prev,
+          [categoryKey]: Math.min(currentVisible + ITEMS_PER_PAGE, totalItems),
+        }));
+      }
+    },
+    [visibleItems, groupedData]
+  );
+
+  // Handle scroll events for infinite loading
+  const handleScroll = useCallback(
+    (e) => {
+      const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
+
+      // Check if we're near the bottom
+      if (scrollHeight - scrollTop - clientHeight < LOAD_MORE_THRESHOLD) {
+        // Find expanded categories and load more items if needed
+        Object.keys(expandedGroups).forEach((key) => {
+          if (expandedGroups[key] && key.includes("-")) {
+            const [parent, category] = key.split("-");
+            if (parent && category) {
+              const categoryKey = `${parent}-${category}`;
+              const currentVisible =
+                visibleItems[categoryKey] || ITEMS_PER_PAGE;
+              const totalItems = groupedData[parent]?.[category]?.length || 0;
+
+              if (currentVisible < totalItems) {
+                loadMoreItems(parent, category);
+              }
+            }
+          }
+        });
+      }
+    },
+    [expandedGroups, visibleItems, groupedData, loadMoreItems]
+  );
+
   const toggleGroup = (key) => {
-    setExpandedGroups((prev) => ({
-      ...prev,
-      [key]: !prev[key],
-    }));
+    setExpandedGroups((prev) => {
+      const newState = {
+        ...prev,
+        [key]: !prev[key],
+      };
+
+      // When expanding a category, ensure we show initial items
+      if (newState[key] && key.includes("-")) {
+        const [parent, category] = key.split("-");
+        if (parent && category) {
+          const categoryKey = `${parent}-${category}`;
+          setVisibleItems((prevVisible) => ({
+            ...prevVisible,
+            [categoryKey]: Math.min(
+              ITEMS_PER_PAGE,
+              groupedData[parent]?.[category]?.length || 0
+            ),
+          }));
+        }
+      }
+
+      return newState;
+    });
   };
 
   const expandAll = () => {
     const allKeys = {};
+    const initialVisibleItems = {};
+
     Object.keys(groupedData).forEach((parent) => {
       allKeys[parent] = true;
       Object.keys(groupedData[parent]).forEach((category) => {
-        allKeys[`${parent}-${category}`] = true;
+        const categoryKey = `${parent}-${category}`;
+        allKeys[categoryKey] = true;
+        initialVisibleItems[categoryKey] = Math.min(
+          ITEMS_PER_PAGE,
+          groupedData[parent][category].length
+        );
       });
     });
+
     setExpandedGroups(allKeys);
+    setVisibleItems((prev) => ({ ...prev, ...initialVisibleItems }));
   };
 
   const collapseAll = () => {
@@ -77,6 +190,10 @@ const MaterialsTable = ({ token, onLogout }) => {
       </div>
     );
   }
+
+  console.log(totals)
+  console.log(groupedData)
+  console.log(expandedGroups)
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -121,11 +238,10 @@ const MaterialsTable = ({ token, onLogout }) => {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-2 sm:space-y-0">
             <div className="flex items-center space-x-2">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <input
                   type="text"
                   placeholder="Search materials..."
-                  className="input-primary pl-10 w-64"
+                  className="input-primary pl-10 w-64 rounded-md"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -164,19 +280,34 @@ const MaterialsTable = ({ token, onLogout }) => {
 
         {/* Table */}
         <div className="bg-white shadow-sm rounded-lg overflow-hidden">
-          <div className="overflow-x-auto table-container">
+          <div
+            ref={tableContainerRef}
+            className="overflow-x-auto table-container"
+            onScroll={handleScroll}
+          >
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0">
+              <thead className="bg-gray-50 sticky top-0 z-10">
                 <tr>
-                  <th className="table-header text-left">Name</th>
-                  <th className="table-header text-right">Start Amount</th>
-                  <th className="table-header text-right">Start Sum</th>
-                  <th className="table-header text-right">Income Amount</th>
-                  <th className="table-header text-right">Income Sum</th>
-                  <th className="table-header text-right">Outgo Amount</th>
-                  <th className="table-header text-right">Outgo Sum</th>
-                  <th className="table-header text-right">End Amount</th>
-                  <th className="table-header text-right">End Sum</th>
+                <th className="table-header" rowSpan={2}>Name</th>
+
+                  <th className="table-header" rowSpan={2}>Color</th>
+                  <th className="table-header" rowSpan={2}>Unit</th>
+                  <th className="table-header" rowSpan={2}>Code</th>
+                  <th className="table-header" rowSpan={2}>Price</th>
+                  <th className="table-header text-center" colSpan={2}>Start</th>
+                  <th className="table-header text-center" colSpan={2}>Income</th>
+                  <th className="table-header text-center" colSpan={2}>Outgo</th>
+                  <th className="table-header text-center" colSpan={2}>End</th>
+                </tr>
+                <tr>
+                  <th className="table-header">Start Amount</th>
+                  <th className="table-header">Start Sum</th>
+                  <th className="table-header">Income Amount</th>
+                  <th className="table-header">Income Sum</th>
+                  <th className="table-header">Outgo Amount</th>
+                  <th className="table-header">Outgo Sum</th>
+                  <th className="table-header">End Amount</th>
+                  <th className="table-header">End Sum</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -187,6 +318,18 @@ const MaterialsTable = ({ token, onLogout }) => {
                       <div className="w-3 h-3 bg-blue-500 rounded-full mr-3"></div>
                       <strong>OVERALL TOTAL</strong>
                     </div>
+                  </td>
+                  <td className="table-cell text-right font-bold text-blue-800">
+                    {formatNumber(totals.overallTotals.remind_start_amount)}
+                  </td>
+                  <td className="table-cell text-right font-bold text-blue-800">
+                    {formatNumber(totals.overallTotals.remind_start_amount)}
+                  </td>
+                  <td className="table-cell text-right font-bold text-blue-800">
+                    {formatNumber(totals.overallTotals.remind_start_amount)}
+                  </td>
+                  <td className="table-cell text-right font-bold text-blue-800">
+                    {formatNumber(totals.overallTotals.remind_start_amount)}
                   </td>
                   <td className="table-cell text-right font-bold text-blue-800">
                     {formatNumber(totals.overallTotals.remind_start_amount)}
@@ -360,68 +503,128 @@ const MaterialsTable = ({ token, onLogout }) => {
 
                           {/* Individual items */}
                           {expandedGroups[`${parent}-${category}`] &&
-                            groupedData[parent][category].map((item) => (
-                              <tr
-                                key={item.material_id}
-                                className="table-row-hover slide-in"
-                              >
-                                <td className="table-cell">
-                                  <div className="pl-12">
-                                    <div className="text-gray-900 font-medium">
-                                      {item.name}
-                                    </div>
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      <span className="inline-flex items-center">
-                                        <span className="font-medium">
-                                          Code:
-                                        </span>
-                                        <span className="ml-1 bg-gray-100 px-2 py-0.5 rounded text-xs">
-                                          {item.code || "N/A"}
-                                        </span>
-                                      </span>
-                                      <span className="ml-3">
-                                        <span className="font-medium">
-                                          Unit:
-                                        </span>
-                                        <span className="ml-1">
-                                          {item.unit}
-                                        </span>
-                                      </span>
-                                      <span className="ml-3">
-                                        <span className="font-medium">ID:</span>
-                                        <span className="ml-1">
-                                          {item.material_id}
-                                        </span>
-                                      </span>
-                                    </div>
-                                  </div>
-                                </td>
-                                <td className="table-cell text-right text-gray-600">
-                                  {formatNumber(item.remind_start_amount)}
-                                </td>
-                                <td className="table-cell text-right text-gray-600">
-                                  {formatNumber(item.remind_start_sum)}
-                                </td>
-                                <td className="table-cell text-right text-green-600">
-                                  {formatNumber(item.remind_income_amount)}
-                                </td>
-                                <td className="table-cell text-right text-green-600">
-                                  {formatNumber(item.remind_income_sum)}
-                                </td>
-                                <td className="table-cell text-right text-red-600">
-                                  {formatNumber(item.remind_outgo_amount)}
-                                </td>
-                                <td className="table-cell text-right text-red-600">
-                                  {formatNumber(item.remind_outgo_sum)}
-                                </td>
-                                <td className="table-cell text-right text-gray-600">
-                                  {formatNumber(item.remind_end_amount)}
-                                </td>
-                                <td className="table-cell text-right text-gray-600">
-                                  {formatNumber(item.remind_end_sum)}
-                                </td>
-                              </tr>
-                            ))}
+                            (() => {
+                              const visibleCategoryItems =
+                                getVisibleCategoryItems(parent, category);
+                              const totalItems =
+                                groupedData[parent][category].length;
+                              const currentVisible =
+                                visibleItems[`${parent}-${category}`] ||
+                                ITEMS_PER_PAGE;
+                              const hasMore = currentVisible < totalItems;
+
+                              return (
+                                <>
+                                  {visibleCategoryItems.map((item) => (
+                                    <tr
+                                      key={item.material_id}
+                                      className="table-row-hover slide-in"
+                                    >
+                                      <td className="table-cell">
+                                        <div className="pl-12">
+                                          <div className="text-gray-900 font-medium">
+                                            {item.name}
+                                          </div>
+                                          <div className="text-xs text-gray-500 mt-1">
+                                            <span className="inline-flex items-center">
+                                              <span className="font-medium">
+                                                Code:
+                                              </span>
+                                              <span className="ml-1 bg-gray-100 px-2 py-0.5 rounded text-xs">
+                                                {item.code || "N/A"}
+                                              </span>
+                                            </span>
+                                            <span className="ml-3">
+                                              <span className="font-medium">
+                                                Unit:
+                                              </span>
+                                              <span className="ml-1">
+                                                {item.unit}
+                                              </span>
+                                            </span>
+                                            <span className="ml-3">
+                                              <span className="font-medium">
+                                                ID:
+                                              </span>
+                                              <span className="ml-1">
+                                                {item.material_id}
+                                              </span>
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </td>
+                                      <td className="table-cell text-right text-gray-600">
+                                        {formatNumber(item.color)}
+                                      </td>
+                                      <td className="table-cell text-right text-gray-600">
+                                        {formatNumber(item.unit)}
+                                      </td>
+                                      <td className="table-cell text-right text-gray-600">
+                                        {formatNumber(item.code)}
+                                      </td>
+                                      <td className="table-cell text-right text-gray-600">
+                                        {formatNumber(item.last_price)}
+                                      </td>
+                                      <td className="table-cell text-right text-gray-600">
+                                        {formatNumber(item.remind_start_amount)}
+                                      </td>
+                                      <td className="table-cell text-right text-gray-600">
+                                        {formatNumber(item.remind_start_sum)}
+                                      </td>
+                                      <td className="table-cell text-right text-green-600">
+                                        {formatNumber(
+                                          item.remind_income_amount
+                                        )}
+                                      </td>
+                                      <td className="table-cell text-right text-green-600">
+                                        {formatNumber(item.remind_income_sum)}
+                                      </td>
+                                      <td className="table-cell text-right text-red-600">
+                                        {formatNumber(item.remind_outgo_amount)}
+                                      </td>
+                                      <td className="table-cell text-right text-red-600">
+                                        {formatNumber(item.remind_outgo_sum)}
+                                      </td>
+                                      <td className="table-cell text-right text-gray-600">
+                                        {formatNumber(item.remind_end_amount)}
+                                      </td>
+                                      <td className="table-cell text-right text-gray-600">
+                                        {formatNumber(item.remind_end_sum)}
+                                      </td>
+                                    </tr>
+                                  ))}
+
+                                  {/* Load More Button */}
+                                  {hasMore && (
+                                    <tr>
+                                      <td
+                                        colSpan={9}
+                                        className="table-cell text-center py-4"
+                                      >
+                                        <button
+                                          onClick={() =>
+                                            loadMoreItems(parent, category)
+                                          }
+                                          className="btn-secondary text-sm px-4 py-2"
+                                          disabled={loading}
+                                        >
+                                          {loading ? (
+                                            <div className="flex items-center justify-center">
+                                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-gray-600 mr-2"></div>
+                                              Loading...
+                                            </div>
+                                          ) : (
+                                            `Load More (${
+                                              totalItems - currentVisible
+                                            } remaining)`
+                                          )}
+                                        </button>
+                                      </td>
+                                    </tr>
+                                  )}
+                                </>
+                              );
+                            })()}
                         </React.Fragment>
                       ))}
                   </React.Fragment>
@@ -436,6 +639,17 @@ const MaterialsTable = ({ token, onLogout }) => {
           <p>
             Total items: {materialsData.length} | Filtered:{" "}
             {filteredData.length}
+            {Object.keys(expandedGroups).some(
+              (key) => expandedGroups[key] && key.includes("-")
+            ) && (
+              <span className="ml-2">
+                | Showing:{" "}
+                {Object.keys(visibleItems).reduce((total, key) => {
+                  return total + (visibleItems[key] || 0);
+                }, 0)}{" "}
+                visible items
+              </span>
+            )}
           </p>
         </div>
       </div>

@@ -1,0 +1,144 @@
+@import "tailwindcss";
+@tailwind utilities;
+
+:root {
+  font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+body {
+  margin: 0;
+}
+
+/* App-specific styles */
+.app {
+  text-align: center;
+}
+
+table {
+  border-collapse: separate; /* MUHIM */
+  border-spacing: 0;
+}
+
+/* Custom button styles */
+.btn-primary {
+  @apply inline-flex items-center px-4 py-2 border border-transparent text-sm bg-gray-700 font-medium rounded-md text-white focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200;
+}
+
+.btn-secondary {
+  @apply inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors duration-200;
+}
+
+.btn-danger {
+  @apply inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-colors duration-200;
+}
+
+/* Input styles */
+.input-primary {
+  @apply appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:z-10 sm:text-sm transition-colors duration-200;
+}
+
+/* Table styles */
+.table-header {
+  @apply px-3 py-2 text-center text-xs border border-gray-300 font-medium text-gray-500 uppercase tracking-wider;
+}
+
+.table-cell {
+  @apply px-3 py-4 whitespace-nowrap text-sm border border-gray-300 text-gray-900;
+}
+
+.table-row-hover {
+  @apply hover:bg-gray-50 transition-colors duration-150;
+}
+
+/* Custom animations */
+.fade-in {
+  animation: fadeIn 0.3s ease-in-out;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.slide-in {
+  animation: slideIn 0.2s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* Table styles */
+.table-container {
+  max-height: calc(100vh - 250px);
+  overflow-y: auto;
+  /* Performance optimizations */
+  will-change: scroll-position;
+  contain: layout style paint;
+}
+
+/* Performance optimization for table rows */
+.table-row-hover {
+  contain: layout;
+  transform: translateZ(0); /* Force GPU acceleration */
+}
+
+/* Smooth scrolling for better UX */
+.table-container {
+  scroll-behavior: smooth;
+}
+
+/* Optimize rendering for large lists */
+.slide-in {
+  will-change: transform, opacity;
+}
+
+/* Animation for collapsible rows */
+.collapsible-row {
+  transition: all 0.2s ease-in-out;
+}
+
+/* Loading animation */
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
+}

@@ -1,5 +1,6 @@
+"use client";
+
 import { useState, useEffect } from "react";
-import { apiService } from "../services/api";
 
 export const useAuth = () => {
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -26,12 +27,19 @@ export const useAuth = () => {
     try {
       setLoading(true);
 
-      // Use the API service for login
-      const response = await apiService.login(username, password);
+      const response = await fetch("/api/login", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ username, password }),
+      });
 
-      if (response.token) {
-        const authToken = response.token;
-        const userData = response.user || { username };
+      const data = await response.json();
+
+      if (response.ok && data.token) {
+        const authToken = data.token.token;
+        const userData = data.user || { username };
 
         // Save to localStorage
         localStorage.setItem("authToken", authToken);
@@ -44,13 +52,16 @@ export const useAuth = () => {
 
         return { success: true };
       } else {
-        throw new Error("No token received");
+        throw new Error(data.error || "No token received");
       }
     } catch (error) {
       console.error("Login failed:", error);
       return {
         success: false,
-        error: error.message || "Login failed. Please try again.",
+        error:
+          error instanceof Error
+            ? error.message
+            : "Login failed. Please try again.",
       };
     } finally {
       setLoading(false);
@@ -70,12 +81,23 @@ export const useAuth = () => {
 
   const refreshToken = async () => {
     try {
-      const response = await apiService.refreshToken(token);
-      if (response.token) {
-        const newToken = response.token;
+      const response = await fetch("/api/refresh-token", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.token) {
+        const newToken = data.token;
         localStorage.setItem("authToken", newToken);
         setToken(newToken);
         return newToken;
+      } else {
+        throw new Error(data.error || "Token refresh failed");
       }
     } catch (error) {
       console.error("Token refresh failed:", error);

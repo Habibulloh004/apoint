@@ -1,8 +1,4 @@
-/**
- * Group materials data by parent and category
- * @param {Array} data - Array of material items
- * @returns {Object} Grouped data structure
- */
+
 export const groupMaterialsData = (data) => {
   const groups = {};
 
@@ -19,11 +15,6 @@ export const groupMaterialsData = (data) => {
   return groups;
 };
 
-/**
- * Calculate totals for all levels (overall, parent, category)
- * @param {Object} groupedData - Grouped materials data
- * @returns {Object} Calculated totals
- */
 export const calculateTotals = (groupedData) => {
   const fields = [
     "remind_start_amount",
@@ -61,7 +52,7 @@ export const calculateTotals = (groupedData) => {
 
       groupedData[parent][category].forEach((item) => {
         fields.forEach((field) => {
-          const value = parseFloat(item[field]) || 0;
+          const value = parseFloat(String(item[field])) || 0;
           overallTotals[field] += value;
           parentTotals[field][parent] += value;
           categoryTotals[field][categoryKey] += value;
@@ -73,27 +64,16 @@ export const calculateTotals = (groupedData) => {
   return { overallTotals, parentTotals, categoryTotals };
 };
 
-/**
- * Format number with thousands separators
- * @param {number|string} num - Number to format
- * @returns {string} Formatted number string
- */
 export const formatNumber = (num) => {
-  const number = parseFloat(num) || 0;
+  const number = parseFloat(String(num)) || 0;
   return new Intl.NumberFormat("en-US", {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
   }).format(number);
 };
 
-/**
- * Format currency
- * @param {number|string} num - Number to format as currency
- * @param {string} currency - Currency code (default: 'USD')
- * @returns {string} Formatted currency string
- */
 export const formatCurrency = (num, currency = "USD") => {
-  const number = parseFloat(num) || 0;
+  const number = parseFloat(String(num)) || 0;
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: currency,
@@ -101,28 +81,17 @@ export const formatCurrency = (num, currency = "USD") => {
   }).format(number);
 };
 
-/**
- * Calculate percentage change
- * @param {number} oldValue - Previous value
- * @param {number} newValue - Current value
- * @returns {number} Percentage change
- */
 export const calculatePercentageChange = (oldValue, newValue) => {
   if (oldValue === 0) return newValue > 0 ? 100 : 0;
   return ((newValue - oldValue) / oldValue) * 100;
 };
 
-/**
- * Calculate total inventory turnover
- * @param {Array} data - Materials data
- * @returns {Object} Turnover calculations
- */
 export const calculateInventoryTurnover = (data) => {
   const totals = data.reduce(
     (acc, item) => {
-      acc.totalStart += parseFloat(item.remind_start_amount) || 0;
-      acc.totalEnd += parseFloat(item.remind_end_amount) || 0;
-      acc.totalOutgo += parseFloat(item.remind_outgo_amount) || 0;
+      acc.totalStart += parseFloat(String(item.remind_start_amount)) || 0;
+      acc.totalEnd += parseFloat(String(item.remind_end_amount)) || 0;
+      acc.totalOutgo += parseFloat(String(item.remind_outgo_amount)) || 0;
       return acc;
     },
     { totalStart: 0, totalEnd: 0, totalOutgo: 0 }
@@ -139,14 +108,7 @@ export const calculateInventoryTurnover = (data) => {
   };
 };
 
-/**
- * Sort materials by specified field
- * @param {Array} data - Materials data
- * @param {string} field - Field to sort by
- * @param {string} direction - 'asc' or 'desc'
- * @returns {Array} Sorted data
- */
-export const sortMaterials = (data, field, direction = "asc") => {
+export const sortMaterials = (data, field, direction) => {
   return [...data].sort((a, b) => {
     let aVal = a[field];
     let bVal = b[field];
@@ -157,14 +119,14 @@ export const sortMaterials = (data, field, direction = "asc") => {
       field.includes("sum") ||
       field.includes("price")
     ) {
-      aVal = parseFloat(aVal) || 0;
-      bVal = parseFloat(bVal) || 0;
+      aVal = parseFloat(String(aVal)) || 0;
+      bVal = parseFloat(String(bVal)) || 0;
     }
 
     // Handle string fields
     if (typeof aVal === "string") {
       aVal = aVal.toLowerCase();
-      bVal = bVal.toLowerCase();
+      bVal = String(bVal).toLowerCase();
     }
 
     if (direction === "asc") {
@@ -175,12 +137,6 @@ export const sortMaterials = (data, field, direction = "asc") => {
   });
 };
 
-/**
- * Filter materials by search term
- * @param {Array} data - Materials data
- * @param {string} searchTerm - Search term
- * @returns {Array} Filtered data
- */
 export const filterMaterials = (data, searchTerm) => {
   if (!searchTerm) return data;
 
